@@ -1,5 +1,7 @@
 ﻿using Microsoft.Test.Input;
 using System;
+using System.Runtime.InteropServices;
+using System.Security;
 using System.Threading.Tasks;
 using System.Windows.Automation;
 using System.Windows.Forms;
@@ -10,11 +12,26 @@ namespace AutoInsertPin
     {
         static async Task Main(string[] args)
         {
+            SecureString securePin = new SecureString();
             if (args.Length == 0)
             {
-                Console.Error.WriteLine("Error: Not passed the password as first argument.");
-                return;
+                Console.WriteLine("Type PIN (Enter to end typing): ");
+                string pin = string.Empty;
+                while (true)
+                {
+                    ConsoleKeyInfo keyInfo = Console.ReadKey(true);
+                    if (keyInfo.Key == ConsoleKey.Enter)
+                        break;
+
+                    securePin.AppendChar(keyInfo.KeyChar);
+                }
             }
+            else
+            {
+                Array.ForEach(args[0].ToCharArray(), securePin.AppendChar);
+            }
+
+            securePin.MakeReadOnly();
 
             Console.WriteLine("Waiting for windows. Press Ctrl+C to finish monitoring windows...");
 
@@ -33,16 +50,12 @@ namespace AutoInsertPin
 
                     Console.WriteLine("Located window");
 
-                    var editControl = window.FindFirst(TreeScope.Descendants, new PropertyCondition(AutomationElement.NameProperty, "PIN"));
-                    if (editControl == null)
+                    var controls = window.FindAll(TreeScope.Descendants, new PropertyCondition(AutomationElement.NameProperty, "PIN"));
+                    if (controls == null || controls.Count != 3)
                         continue;
 
-                    editControl.SetFocus();
-                    SendKeys.SendWait("^(a)");
-                    await Task.Delay(250);
-                    SendKeys.SendWait("{DELETE}");
-                    await Task.Delay(250);
-                    SendKeys.SendWait(args[0]);
+                    controls[2].SetFocus();
+                    SendKeys.SendWait(ConvertToPlainString(securePin));
                     await Task.Delay(250);
 
                     var okControl = window.FindFirst(TreeScope.Descendants, new PropertyCondition(AutomationElement.NameProperty, "OK"));
@@ -52,13 +65,22 @@ namespace AutoInsertPin
                     Mouse.MoveTo(new System.Drawing.Point((int)okControl.GetClickablePoint().X, (int)okControl.GetClickablePoint().Y));
                     Mouse.Click(MouseButton.Left);
 
-                    await Task.Delay(1000);
+                    await Task.Delay(10000);
                 }
-                catch(Exception e)
+                catch (Exception e)
                 {
                     Console.Error.WriteLine(e.Message);
                 }
             }
+        }
+
+        public static string ConvertToPlainString(SecureString input)
+        {
+            IntPtr stringPointer = Marshal.SecureStringToBSTR(input);
+            string plain = Marshal.PtrToStringBSTR(stringPointer);
+            Marshal.ZeroFreeBSTR(stringPointer);
+
+            return plain;
         }
     }
 }
