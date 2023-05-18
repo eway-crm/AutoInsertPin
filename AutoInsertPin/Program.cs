@@ -12,6 +12,8 @@ namespace AutoInsertPin
     {
         static async Task Main(string[] args)
         {
+            Console.WriteLine(System.Environment.OSVersion);
+
             SecureString securePin = new SecureString();
             if (args.Length == 0)
             {
@@ -54,7 +56,7 @@ namespace AutoInsertPin
                     if (controls == null || controls.Count != 3)
                         continue;
 
-                    controls[2].SetFocus();
+                    controls[System.Environment.OSVersion.Version.Major < 10 ? 2 : 1].SetFocus();
                     SendKeys.SendWait(ConvertToPlainString(securePin));
                     await Task.Delay(250);
 
